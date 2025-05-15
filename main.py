@@ -1,22 +1,37 @@
-import telebot
+import logging
 import openai
-import os
+from telegram import Update
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 
-TELEGRAM_TOKEN = os.environ.get('TELEGRAM_TOKEN')
-OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
+# === ТВОЙ ТОКЕН БОТА ===
+TELEGRAM_TOKEN = 'ВСТАВЬ_СЮДА_СВОЙ_ТОКЕН'
 
-bot = telebot.TeleBot(TELEGRAM_TOKEN)
-openai.api_key = OPENAI_API_KEY
+# === НАСТРОЙКА ПРОКСИ GPT ===
+openai.api_key = 'free'  # или любое слово
+openai.base_url = 'https://chatgpt.pawan.krd/v1/'  # прокси
 
-@bot.message_handler(func=lambda message: True)
-def handle_message(message):
+logging.basicConfig(level=logging.INFO)
+
+# Команда /start
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("Привет! Напиши мне сообщение — я отвечу с помощью GPT.")
+
+# Обработка сообщений
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_message = update.message.text
     try:
         response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
-            messages=[{"role": "user", "content": message.text}]
+            messages=[{"role": "user", "content": user_message}]
         )
-        bot.send_message(message.chat.id, response['choices'][0]['message']['content'])
+        reply = response.choices[0].message.content
     except Exception as e:
-        bot.send_message(message.chat.id, f"Ошибка: {str(e)}")
+        reply = f"Произошла ошибка: {e}"
 
-bot.polling()
+    await update.message.reply_text(reply)
+
+if _name_ == '_main_':
+    app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    app.run_polling()
